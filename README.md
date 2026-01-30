@@ -22,19 +22,19 @@ This project demonstrates low level networking, socket concepts and basic usage 
 - OS: Arch linux (Or any other linux distro, but this was written on Arch linux)
 - Compiler: gcc or clang are fine as long as the version of C++ is minimum 17. This project used clang
 
-# Clone Repo and change into its directory
+### Clone Repo and change into its directory
 ```
 git clone https://github.com/your-username/cpp-http-server.git
 cd cpp-http-server
 ```
 
-#Compile and run
+### Compile and run
 ```
 g++ main.cpp -o server -std=c++17
 ./server
 ```
 
-# URL for browser
+### URL for browser
 ```
 http://127.0.0.1:8080/
 ```

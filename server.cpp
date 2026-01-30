@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iostream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include <functional>
@@ -58,8 +59,42 @@ void handleJSON() {
 
 }
 
-void handleHTML() {
+void sendCSS(int &clientSock_FD) {
+    std::string buffer{};
+    buffer.resize(std::filesystem::file_size("./style.css"));
 
+    std::ifstream inp("./style.css", std::ios::binary);
+    inp.read(buffer.data(), buffer.size());
+
+    std::string req =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: text/css\r\n"
+    "Content-Length: " + std::to_string(buffer.size()) + "\r\n"
+    "\r\n";
+
+    send(clientSock_FD, req.data(), req.size(), 0);
+    send(clientSock_FD, buffer.data(), buffer.size(), 0);
+
+    close(clientSock_FD);
+}
+
+void sendJS(int &clientSock_FD) {
+    std::string buffer{};
+    buffer.resize(std::filesystem::file_size("./script.js"));
+
+    std::ifstream inp("./script.js", std::ios::binary);
+    inp.read(buffer.data(), buffer.size());
+
+    std::string req =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: application/javascript\r\n"
+    "Content-Length: " + std::to_string(buffer.size()) + "\r\n"
+    "\r\n";
+
+    send(clientSock_FD, req.data(), req.size(), 0);
+    send(clientSock_FD, buffer.data(), buffer.size(), 0);
+
+    close(clientSock_FD);
 }
 
 void handleRequest(const char* data, int &clientSock_FD) {
@@ -74,7 +109,9 @@ void handleRequest(const char* data, int &clientSock_FD) {
    static std::unordered_map<std::string, std::function<void(int)>> mapFunctions {
 
        {"/", [](int x){root(x);}},
-       {"/favicon.ico", [] (int x) {sendFavIcon(x);}}
+       {"/favicon.ico", [] (int x) {sendFavIcon(x);}},
+        {"/style.css", [] (int x) {sendCSS(x);}},
+        {"/script.js", [] (int x) {sendJS(x);}}
    };
 
    auto it = mapFunctions.find(path);

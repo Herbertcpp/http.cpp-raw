@@ -120,6 +120,13 @@ void handleRequest(const char* data, int &clientSock_FD) {
        it->second(clientSock_FD);
    } else {
        std::cout << "Couldn't find requested Function: " << path << "\n";
+
+       std::string errResponse =
+       "HTTP/1.1 404 Not Found\r\n"
+       "Conten-Length: 0\r\n"
+       "\r\n";
+
+      send(clientSock_FD, errResponse.data(), errResponse.size(), 0);
    }
 
 }

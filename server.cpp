@@ -20,13 +20,36 @@ void root(int &clientSock_FD) {
     std::string rootReturnMessage =
     "HTTP/1.1 200 OK\r\n"
     "Content-Type: text/html; charset=UTF-8\r\n"
-    "Content-length: " + std::to_string(buffer_HTML.size()) + "\r\n"
+    "Content-Length: " + std::to_string(buffer_HTML.size()) + "\r\n"
     "\r\n";
 
     send(clientSock_FD, rootReturnMessage.data(), rootReturnMessage.size(), 0);
     send(clientSock_FD, buffer_HTML.data(), buffer_HTML.size(), 0);
 
     std::cout << "Sent homepage to client\n";
+
+    close(clientSock_FD);
+}
+
+void sendFavIcon(int &clientSock_FD) {
+
+
+    std::ifstream favIcon("./favicon.ico", std::ios::binary);
+    std::string buffer{};
+    buffer.resize(std::filesystem::file_size("./favicon.ico"));
+
+    favIcon.read(buffer.data(), buffer.size());
+
+    std::string req =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: image/x-icon\r\n"
+    "Content-Length: " + std::to_string(buffer.size()) + "\r\n"
+    "\r\n";
+
+    send(clientSock_FD, req.data(), req.size(), 0);
+    send(clientSock_FD, buffer.data(), buffer.size(), 0);
+
+    std::cout << "Sent favicon to client\n";
 
     close(clientSock_FD);
 }
@@ -39,58 +62,27 @@ void handleHTML() {
 
 }
 
-void handleParsedHTTP(std::vector<std::string> &header, int &clientSock_FD);
+void handleRequest(const char* data, int &clientSock_FD) {
+    std::istringstream header(data);
+    std::string method, path, version;
 
-void parseHTTP(char* data, int& clientSock_FD) {
-  const char* req = data;
-
-  std::string headers[10]{};
-
-  int currentHeader = 0;
-
-  while(*data) {
-
-    headers[currentHeader] += *data;
-    ++data;
-
-    if(*data == '\r') {
-        currentHeader++;
+    if(!(header >> method >> path >> version)) {
+        std::cout << "Error parsing request";
+        return;
     }
 
-  }
+   static std::unordered_map<std::string, std::function<void(int)>> mapFunctions {
 
-  std::istringstream header(headers[0]);
-  std::vector<std::string> words;
-  std::string temp;
-
-  while(header >> temp) {
-      words.push_back(temp);
-  }
-
-  std::string method = words[0];
-
-  if (method == "GET") {
-      handleParsedHTTP(words, clientSock_FD);
-      std::cout << "Calling Get method";
-  } else {
-      std::cout << "not a get method";
-  }
-}
-
-void handleParsedHTTP(std::vector<std::string> &header, int &clientSock_FD) {
-
-   std::unordered_map<std::string, std::function<void(int)>> mapFunctions;
-
-   mapFunctions["/"] = [](int sock){ root(sock); };
-
-   std::string path = header[1];
+       {"/", [](int x){root(x);}},
+       {"/favicon.ico", [] (int x) {sendFavIcon(x);}}
+   };
 
    auto it = mapFunctions.find(path);
 
    if(it != mapFunctions.end()) {
        it->second(clientSock_FD);
    } else {
-       std::cout << "Couldn't find requested Function";
+       std::cout << "Couldn't find requested Function: " << path << "\n";
    }
 
 }
@@ -106,7 +98,9 @@ int main() {
   serverAddr.sin_port = htons(8080);
   inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
-  bind(handle, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+  if(bind(handle, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) > 0) {
+      std::cout << "Error binding";
+  };
 
   listen(handle, 10);
 
@@ -126,7 +120,7 @@ int main() {
   char temp[128] = {0};
 
   recv(clientSocket, buffer, sizeof(buffer), 0);
-    parseHTTP(buffer, clientSocket);
+    handleRequest(buffer, clientSocket);
   }
 
   close(handle);

@@ -1,20 +1,47 @@
+#include <filesystem>
 #include <iostream>
 #include <unordered_map>
 #include <vector>
 #include <functional>
 #include <sstream>
+#include <fstream>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 
-void root() {
-    std::cout << "Welcome to the fucking server\n";
+void root(int &clientSock_FD) {
+
+    std::ifstream readFile("./root.html", std::ios::binary);
+    std::string buffer_HTML;
+    buffer_HTML.resize(std::filesystem::file_size("./root.html"));
+    readFile.read(buffer_HTML.data(), buffer_HTML.size());
+
+    std::string rootReturnMessage =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: text/html; charset=UTF-8\r\n"
+    "Content-length: " + std::to_string(buffer_HTML.size()) + "\r\n"
+    "\r\n";
+
+    send(clientSock_FD, rootReturnMessage.data(), rootReturnMessage.size(), 0);
+    send(clientSock_FD, buffer_HTML.data(), buffer_HTML.size(), 0);
+
+    std::cout << "Sent homepage to client\n";
+
+    close(clientSock_FD);
 }
 
-void handleParsedHTTP(std::vector<std::string> &header);
+void handleJSON() {
 
-void parseHTTP(char* data) {
+}
+
+void handleHTML() {
+
+}
+
+void handleParsedHTTP(std::vector<std::string> &header, int &clientSock_FD);
+
+void parseHTTP(char* data, int& clientSock_FD) {
   const char* req = data;
 
   std::string headers[10]{};
@@ -43,25 +70,25 @@ void parseHTTP(char* data) {
   std::string method = words[0];
 
   if (method == "GET") {
-      handleParsedHTTP(words);
+      handleParsedHTTP(words, clientSock_FD);
       std::cout << "Calling Get method";
   } else {
       std::cout << "not a get method";
   }
 }
 
-void handleParsedHTTP(std::vector<std::string> &header) {
+void handleParsedHTTP(std::vector<std::string> &header, int &clientSock_FD) {
 
-   std::unordered_map<std::string, std::function<void(void)>> mapFunctions;
+   std::unordered_map<std::string, std::function<void(int)>> mapFunctions;
 
-   mapFunctions["/"] = root;
+   mapFunctions["/"] = [](int sock){ root(sock); };
 
    std::string path = header[1];
 
    auto it = mapFunctions.find(path);
 
    if(it != mapFunctions.end()) {
-       it->second();
+       it->second(clientSock_FD);
    } else {
        std::cout << "Couldn't find requested Function";
    }
@@ -89,14 +116,17 @@ int main() {
     "Connection: close\r\n"
     "\r\n";
 
+  std::cout << "Waiting for client...\n";
   while (1) {
   int clientSocket = accept(handle, nullptr, nullptr);
+
+  std::cout << "Client connecting...\n";
 
   char buffer[4096] = {0};
   char temp[128] = {0};
 
   recv(clientSocket, buffer, sizeof(buffer), 0);
-    parseHTTP(buffer);
+    parseHTTP(buffer, clientSocket);
   }
 
   close(handle);
